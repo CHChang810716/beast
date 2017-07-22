@@ -10,10 +10,16 @@
 cmake_minimum_required (VERSION 3.5.1)
 
 project (Beast VERSION 189)
+include(cmake/HunterGate.cmake)
+HunterGate(
+    URL "https://github.com/ruslo/hunter/archive/v0.23.202.tar.gz"
+    SHA1 "931b1cb6b36a7a96948d2cfc8ec5e553bf3160f3"
+)
+
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
-option (Beast_BUILD_EXAMPLES "Build examples" ON)
-option (Beast_BUILD_TESTS "Build tests" ON)
+option (Beast_BUILD_EXAMPLES "Build examples" OFF)
+option (Beast_BUILD_TESTS "Build tests" OFF)
 
 if (MSVC)
     set (CMAKE_VERBOSE_MAKEFILE FALSE)
@@ -71,11 +77,19 @@ include_directories (include)
 
 get_filename_component (BOOST_ROOT ../../ ABSOLUTE)
 
-# VFALCO I want static but "b2 stage" builds a minimal set which excludes static
-add_definitions (-DBOOST_ALL_STATIC_LINK=1)
-
-# Some of the tests use deprecated APIs
-#add_definitions (-DBOOST_ASIO_NO_DEPRECATED=1)
+# <<<<<<< HEAD
+# # VFALCO I want static but "b2 stage" builds a minimal set which excludes static
+# add_definitions (-DBOOST_ALL_STATIC_LINK=1)
+# 
+# # Some of the tests use deprecated APIs
+# #add_definitions (-DBOOST_ASIO_NO_DEPRECATED=1)
+# =======
+set(BOOST_COMPONENTS system)
+if (Beast_BUILD_EXAMPLES OR Beast_BUILD_TESTS)
+    list(APPEND BOOST_COMPONENTS coroutine context filesystem program_options thread)
+endif()
+hunter_add_package(Boost COMPONENTS ${BOOST_COMPONENTS})
+find_package (Boost CONFIG REQUIRED ${BOOST_COMPONENTS})
 
 add_definitions (-DBOOST_ASIO_DISABLE_BOOST_ARRAY=1)
 add_definitions (-DBOOST_ASIO_DISABLE_BOOST_BIND=1)
@@ -96,23 +110,13 @@ endif()
 # OpenSSL
 #
 
-if (APPLE AND NOT DEFINED ENV{OPENSSL_ROOT_DIR})
-  find_program(HOMEBREW brew)
-  if (NOT HOMEBREW STREQUAL "HOMEBREW-NOTFOUND")
-    execute_process(COMMAND brew --prefix openssl
-      OUTPUT_VARIABLE OPENSSL_ROOT_DIR
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-endif()
-
-find_package(OpenSSL)
-
-if (OPENSSL_FOUND)
+# Only used for examples and tests
+if(Beast_BUILD_EXAMPLES OR Beast_BUILD_TESTS)
+    hunter_add_package(OpenSSL)
+    find_package(OpenSSL REQUIRED)
     add_definitions (-DBOOST_BEAST_USE_OPENSSL=1)
-
 else()
     add_definitions (-DBOOST_BEAST_USE_OPENSSL=0)
-    message("OpenSSL not found.")
 endif()
 
 #
@@ -163,6 +167,60 @@ elseif ("${VARIANT}" STREQUAL "release")
     set (CMAKE_BUILD_TYPE RELEASE)
 
 endif()
+
+#-------------------------------------------------------------------------------
+#
+# Library interface
+#
+
+add_library (${PROJECT_NAME} INTERFACE)
+target_link_libraries (${PROJECT_NAME} INTERFACE Boost::system)
+if (NOT MSVC)
+    target_link_libraries (${PROJECT_NAME} INTERFACE Threads::Threads)
+endif()
+target_compile_definitions (${PROJECT_NAME} INTERFACE BOOST_COROUTINES_NO_DEPRECATION_WARNING=1)
+
+# Install
+
+set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+set(config_install_dir "lib/cmake/${PROJECT_NAME}")
+set(include_install_dir "include")
+
+set(version_config "${generated_dir}/${PROJECT_NAME}ConfigVersion.cmake")
+set(project_config "${generated_dir}/${PROJECT_NAME}Config.cmake")
+set(targets_export_name "${PROJECT_NAME}Targets")
+set(namespace "${PROJECT_NAME}::")
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${version_config}" COMPATIBILITY SameMajorVersion
+)
+
+# Note: use 'targets_export_name'
+configure_file("cmake/Config.cmake.in" "${project_config}" @ONLY)
+
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT "${targets_export_name}"
+    INCLUDES DESTINATION "${include_install_dir}"
+)
+
+install(
+    DIRECTORY "include/"
+    DESTINATION "${include_install_dir}"
+)
+
+install(
+    FILES "${project_config}" "${version_config}"
+    DESTINATION "${config_install_dir}"
+)
+
+install(
+    EXPORT "${targets_export_name}"
+    NAMESPACE "${namespace}"
+    DESTINATION "${config_install_dir}"
+)
 
 #-------------------------------------------------------------------------------
 #
