@@ -9,12 +9,12 @@
 
 cmake_minimum_required (VERSION 3.5.1)
 
-project (Beast VERSION 189)
 include(cmake/HunterGate.cmake)
 HunterGate(
     URL "https://github.com/ruslo/hunter/archive/v0.23.202.tar.gz"
     SHA1 "931b1cb6b36a7a96948d2cfc8ec5e553bf3160f3"
 )
+project (Beast VERSION 189)
 
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
