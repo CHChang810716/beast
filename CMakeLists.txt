@@ -7,7 +7,7 @@
 # Official repository: https://github.com/boostorg/beast
 #
 
-cmake_minimum_required (VERSION 3.5.1)
+cmake_minimum_required (VERSION 3.10.0)
 
 include(cmake/HunterGate.cmake)
 HunterGate(
